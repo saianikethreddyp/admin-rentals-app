@@ -1,10 +1,41 @@
 {
-  "plugins": [
-    "expo-router",
-    "expo-status-bar",
-    "expo-secure-store",
-    "@react-native-community/datetimepicker",
-    "expo-font",
-    "expo-asset"
-  ]
+  "expo": {
+    "name": "Thandra Admin",
+    "slug": "thandra-admin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "thandra-admin",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "android": {
+      "package": "com.thandracars.admin",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#0F172A",
+        "foregroundImage": "./assets/adaptive-icon.png"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0F172A",
+          "imageWidth": 200
+        }
+      ],
+      "expo-secure-store",
+      "expo-font",
+      "expo-asset",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Thandra Admin needs access to your photos so you can add pictures of cars."
+        }
+      ]
+    ]
+  }
 }
