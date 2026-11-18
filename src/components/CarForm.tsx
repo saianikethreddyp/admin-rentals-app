@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { Button } from 'react-native-paper';
+import { Button, Switch, Text } from 'react-native-paper';
 
-import type { CarInput, CarPatch } from '@/api/hooks';
+import type { CarPatch, NewCar } from '@/api/hooks';
 import type { Car, CarStatus, FuelType, Hub, Transmission } from '@/api/types';
-import { spacing } from '@/theme';
+import { colors, spacing } from '@/theme';
 import { normalizePlate, validateCar, type CarFormValues } from '@/utils/validation';
 import { FormField, Select, type Option } from './ui';
 
@@ -30,7 +30,7 @@ type Props = {
   car?: Car;
   submitting: boolean;
   serverErrors?: Record<string, string>;
-  onCreate?: (input: CarInput) => void;
+  onCreate?: (input: NewCar) => void;
   onUpdate?: (patch: CarPatch) => void;
   defaultHubId?: string;
 };
@@ -48,6 +48,7 @@ export function CarForm({ hubs, car, submitting, serverErrors, onCreate, onUpdat
     price_per_day: car ? String(car.price_per_day) : '',
   });
   const [status, setStatus] = useState<CarStatus>(car?.status ?? 'available');
+  const [enabled, setEnabled] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const set = (k: keyof CarFormValues) => (t: string) => setV((s) => ({ ...s, [k]: t }));
 
@@ -69,7 +70,7 @@ export function CarForm({ hubs, car, submitting, serverErrors, onCreate, onUpdat
       price_per_day: Number(v.price_per_day),
     };
     if (car) onUpdate?.({ ...common, status });
-    else onCreate?.({ ...common, hub_id: v.hub_id });
+    else onCreate?.({ ...common, hub_id: v.hub_id, enabled });
   }
 
   return (
@@ -89,7 +90,19 @@ export function CarForm({ hubs, car, submitting, serverErrors, onCreate, onUpdat
       <Select label="Fuel" value={v.fuel_type as FuelType} options={FUEL} onChange={(x) => setV((s) => ({ ...s, fuel_type: x }))} error={err('fuel_type')} />
       <Select label="Transmission" value={v.transmission as Transmission} options={TRANSMISSION} onChange={(x) => setV((s) => ({ ...s, transmission: x }))} error={err('transmission')} />
       <FormField label="Price per day (₹)" value={v.price_per_day} onChangeText={set('price_per_day')} keyboardType="number-pad" error={err('price_per_day')} placeholder="1800" />
-      {car ? <Select label="Status" value={status} options={STATUS} onChange={setStatus} /> : null}
+      {car ? (
+        <Select label="Status" value={status} options={STATUS} onChange={setStatus} />
+      ) : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm }}>
+          <View style={{ flex: 1, paddingRight: spacing.md }}>
+            <Text variant="titleSmall">Enabled</Text>
+            <Text variant="bodySmall" style={{ color: colors.muted }}>
+              {enabled ? 'Customers can see and book this car right away.' : 'Added as disabled. Customers cannot see it until you enable it.'}
+            </Text>
+          </View>
+          <Switch value={enabled} onValueChange={setEnabled} />
+        </View>
+      )}
 
       <Button mode="contained" onPress={submit} loading={submitting} disabled={submitting} contentStyle={{ paddingVertical: 6 }} style={{ marginTop: spacing.sm }}>
         {car ? 'Save changes' : 'Add car'}

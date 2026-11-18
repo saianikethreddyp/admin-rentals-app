@@ -2,11 +2,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, View } from 'react-native';
-import { Icon, IconButton, Text, TouchableRipple } from 'react-native-paper';
+import { Icon, IconButton, Switch, Text, TouchableRipple } from 'react-native-paper';
 
 import { useCar, useDeletePhoto, useHubs, useUpdateCar, useUploadPhoto } from '@/api/hooks';
 import { CarForm } from '@/components/CarForm';
-import { confirm, ListState, Screen, SectionTitle, showError, useToast } from '@/components/ui';
+import { confirm, ListState, Panel, Screen, SectionTitle, showError, useToast } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import { fieldErrors } from '@/utils/errors';
 
@@ -70,6 +70,17 @@ export default function CarDetailScreen() {
     }
   }
 
+  const enabled = c.status === 'available';
+  async function toggleEnabled(next: boolean) {
+    if (!next && !(await confirm('Disable this car?', 'Customers will no longer see or book it. Existing bookings are not cancelled.', 'Disable', true))) return;
+    try {
+      await update.mutateAsync({ status: next ? 'available' : 'maintenance' });
+      toast.show(next ? 'Car enabled' : 'Car disabled');
+    } catch (e) {
+      showError(e, next ? 'Could not enable the car' : 'Could not disable the car');
+    }
+  }
+
   async function deletePhoto(key: string) {
     if (!(await confirm('Delete this photo?', 'It will be removed from the car for good.', 'Delete', true))) return;
     try {
@@ -88,6 +99,16 @@ export default function CarDetailScreen() {
         {c.plate}
         {hubName ? ` · ${hubName}` : ''}
       </Text>
+
+      <Panel style={styles.enableRow}>
+        <View style={{ flex: 1, paddingRight: spacing.md }}>
+          <Text variant="titleSmall">{enabled ? 'Enabled' : c.status === 'retired' ? 'Retired' : 'Disabled'}</Text>
+          <Text variant="bodySmall" style={{ color: colors.muted }}>
+            {enabled ? 'Customers can see and book this car.' : 'Hidden from customers. Turn on to make it bookable again.'}
+          </Text>
+        </View>
+        <Switch value={enabled} onValueChange={toggleEnabled} disabled={update.isPending} />
+      </Panel>
 
       <SectionTitle>
         Photos ({c.photos.length}/{MAX_PHOTOS})
@@ -147,6 +168,7 @@ export default function CarDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  enableRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   photoWrap: { width: 120, height: 90, borderRadius: 12 },
   photo: { width: 120, height: 90, borderRadius: 12, backgroundColor: colors.border },
   photoDelete: { position: 'absolute', top: -4, right: -4, margin: 0 },

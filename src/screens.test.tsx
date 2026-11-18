@@ -72,8 +72,20 @@ describe('CarForm', () => {
     await fireEvent.press(screen.getByText('Add car'));
     expect(onCreate).toHaveBeenCalledWith({
       hub_id: 'h1', brand: 'Maruti', model: 'Swift', plate: 'TS09EA1234', year: new Date().getFullYear(),
-      fuel_type: 'petrol', transmission: 'manual', seats: 5, price_per_day: 1800,
+      fuel_type: 'petrol', transmission: 'manual', seats: 5, price_per_day: 1800, enabled: true,
     });
+  });
+
+  it('can add a car as disabled', async () => {
+    const onCreate = jest.fn();
+    await renderWithPaper(<CarForm hubs={[hub]} submitting={false} onCreate={onCreate} />);
+    await fireEvent.changeText(screen.getByLabelText('Brand'), 'Maruti');
+    await fireEvent.changeText(screen.getByLabelText('Model'), 'Swift');
+    await fireEvent.changeText(screen.getByLabelText('Registration number'), 'TS09EA1234');
+    await fireEvent.changeText(screen.getByLabelText('Price per day (₹)'), '1800');
+    await fireEvent(screen.getByRole('switch'), 'valueChange', false);
+    await fireEvent.press(screen.getByText('Add car'));
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }));
   });
 
   it('edits an existing car without asking for the hub', async () => {

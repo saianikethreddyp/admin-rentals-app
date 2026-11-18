@@ -1,11 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, StyleSheet, View } from 'react-native';
-import { FAB, Icon, Text, TouchableRipple } from 'react-native-paper';
+import { FAB, Icon, Switch, Text, TouchableRipple } from 'react-native-paper';
 
-import { flatten, useCars, useHubs } from '@/api/hooks';
+import { flatten, useCars, useHubs, useUpdateCar } from '@/api/hooks';
 import type { Car, CarStatus } from '@/api/types';
-import { FilterChips, FooterLoader, ListState, Pill, type Option } from '@/components/ui';
+import { confirm, FilterChips, FooterLoader, ListState, Pill, showError, useToast, type Option } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import { money } from '@/utils/format';
 
@@ -26,6 +26,18 @@ const carStatus: Record<CarStatus, { label: string; color: string; bg: string }>
 
 function CarRow({ car, hubName, onPress }: { car: Car; hubName?: string; onPress: () => void }) {
   const s = carStatus[car.status];
+  const toast = useToast();
+  const update = useUpdateCar(car.id);
+  const enabled = car.status === 'available';
+  async function toggle(next: boolean) {
+    if (!next && !(await confirm('Disable this car?', 'Customers will no longer see or book it. Existing bookings are not cancelled.', 'Disable', true))) return;
+    try {
+      await update.mutateAsync({ status: next ? 'available' : 'maintenance' });
+      toast.show(next ? 'Car enabled' : 'Car disabled');
+    } catch (e) {
+      showError(e, next ? 'Could not enable the car' : 'Could not disable the car');
+    }
+  }
   const photo = car.photos[0]?.url;
   return (
     <TouchableRipple onPress={onPress} borderless style={styles.touch}>
@@ -56,7 +68,10 @@ function CarRow({ car, hubName, onPress }: { car: Car; hubName?: string; onPress
                 / day
               </Text>
             </Text>
-            <Pill label={s.label} color={s.color} bg={s.bg} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <Pill label={s.label} color={s.color} bg={s.bg} />
+              <Switch value={enabled} onValueChange={toggle} disabled={update.isPending} accessibilityLabel={`${enabled ? 'Disable' : 'Enable'} ${car.brand} ${car.model}`} />
+            </View>
           </View>
         </View>
       </View>

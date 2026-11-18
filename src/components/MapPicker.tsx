@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentType, type Ref } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Button, List, Text, TextInput } from 'react-native-paper';
-import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import { WebView as WebViewBase, type WebViewMessageEvent, type WebViewProps } from 'react-native-webview';
+
+// react-native-webview 14 declares `WebView<P = undefined>` as Component<WebViewProps & P>, which
+// collapses to `never` in JSX. Runtime is fine; give it the props type it should have had.
+type WebViewHandle = InstanceType<typeof WebViewBase<object>>;
+const WebView = WebViewBase as unknown as ComponentType<WebViewProps & { ref?: Ref<WebViewHandle> }>;
 
 import { colors, spacing } from '@/theme';
 
@@ -13,15 +18,39 @@ const DEFAULT_CENTER: LatLng = { latitude: 17.385, longitude: 78.4867 };
 const NOMINATIM = 'https://nominatim.openstreetmap.org';
 const GEOCODER_HEADERS = { Accept: 'application/json', 'Accept-Language': 'en', 'User-Agent': 'ThandraAdmin/1.0' };
 
-export type Place = { name: string; latitude: number; longitude: number };
+export type Place = { name: string; latitude: number; longitude: number; approximate?: boolean };
 
-/** Looks up places in India by free text, using OpenStreetMap's Nominatim. */
-export async function searchPlaces(query: string, signal?: AbortSignal): Promise<Place[]> {
+async function nominatimSearch(query: string, signal?: AbortSignal): Promise<Place[]> {
   const url = `${NOMINATIM}/search?format=jsonv2&limit=6&countrycodes=in&q=${encodeURIComponent(query)}`;
   const res = await fetch(url, { headers: GEOCODER_HEADERS, signal });
   if (!res.ok) throw new Error('Place search is unavailable right now.');
   const rows = (await res.json()) as { display_name: string; lat: string; lon: string }[];
   return rows.map((r) => ({ name: r.display_name, latitude: Number(r.lat), longitude: Number(r.lon) }));
+}
+
+/**
+ * Candidate queries from most to least specific. Full postal addresses (shop, building, "beside ...")
+ * rarely exist in OpenStreetMap, so we drop the leading segment one at a time, keeping at least the
+ * last two (locality + city) and skipping the pincode/state noise.
+ */
+export function queryCandidates(query: string): string[] {
+  const clean = query.replace(/\b\d{6}\b/g, '').replace(/-\s*(?=,|$)/g, '').replace(/\bB\.?\s?N\.?\s?Reddy\b/gi, 'B.N Reddy');
+  const parts = clean.split(',').map((x) => x.replace(/\s+/g, ' ').replace(/[-\s]+$/, '').trim()).filter(Boolean);
+  const noState = parts.filter((x) => !/^(telangana|andhra pradesh|india)$/i.test(x));
+  const out: string[] = [query.trim()];
+  for (let i = 0; i <= noState.length - 2 && out.length < 5; i++) out.push(noState.slice(i).join(', '));
+  return [...new Set(out)];
+}
+
+/** Looks up places in India by free text, using OpenStreetMap's Nominatim. */
+export async function searchPlaces(query: string, signal?: AbortSignal): Promise<Place[]> {
+  const candidates = queryCandidates(query);
+  for (let i = 0; i < candidates.length; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, 1100)); // Nominatim allows ~1 request/second
+    const found = await nominatimSearch(candidates[i], signal);
+    if (found.length > 0) return i === 0 ? found : found.map((f) => ({ ...f, approximate: true }));
+  }
+  return [];
 }
 
 /** Turns coordinates into a readable address. Returns null if none is found. */
@@ -72,7 +101,7 @@ type Props = {
  * OpenStreetMap map. Coordinates are never typed by hand.
  */
 export function MapPicker({ value, onChange, height = 280 }: Props) {
-  const web = useRef<WebView>(null);
+  const web = useRef<WebViewHandle>(null);
   const html = useMemo(() => buildHtml(value), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [ready, setReady] = useState(false);
   const [query, setQuery] = useState('');
@@ -105,6 +134,7 @@ export function MapPicker({ value, onChange, height = 280 }: Props) {
     try {
       const found = await searchPlaces(q, abort.current.signal);
       setResults(found);
+      if (found[0]?.approximate) setMessage('Exact address not on the map. Showing the nearest area; pick one, then drag the pin to the entrance.');
       if (found.length === 0) setMessage('No place found. Try a nearby landmark, or tap the map.');
     } catch (err) {
       if ((err as Error).name !== 'AbortError') setMessage((err as Error).message || 'Search failed.');

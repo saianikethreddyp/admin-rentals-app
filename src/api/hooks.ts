@@ -94,9 +94,19 @@ function useCarCache() {
   };
 }
 
+/** `enabled: false` adds the car disabled (status "maintenance"), so customers cannot see or book it yet. */
+export type NewCar = CarInput & { enabled?: boolean };
+
 export function useCreateCar() {
   const cache = useCarCache();
-  return useMutation({ mutationFn: (input: CarInput) => api.request<Car>('/v1/cars', { method: 'POST', body: input }), onSuccess: cache });
+  return useMutation({
+    mutationFn: async ({ enabled = true, ...input }: NewCar) => {
+      const car = await api.request<Car>('/v1/cars', { method: 'POST', body: input });
+      if (enabled) return car;
+      return api.request<Car>(`/v1/cars/${car.id}`, { method: 'PATCH', body: { status: 'maintenance' } satisfies CarPatch });
+    },
+    onSuccess: cache,
+  });
 }
 
 export function useUpdateCar(id: string) {
@@ -143,6 +153,19 @@ export function useSaveHub(id?: string) {
       id ? api.request<Hub>(`/v1/hubs/${id}`, { method: 'PATCH', body: input }) : api.request<Hub>('/v1/hubs', { method: 'POST', body: input }),
     onSuccess: (hub) => {
       qc.setQueryData(['hub', hub.id], hub);
+      qc.invalidateQueries({ queryKey: ['hubs'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+/** Deletes a hub that has no cars or bookings. The API answers 409 otherwise. */
+export function useDeleteHub(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.request<void>(`/v1/hubs/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.removeQueries({ queryKey: ['hub', id] });
       qc.invalidateQueries({ queryKey: ['hubs'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
