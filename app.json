@@ -33,9 +33,16 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Thandra Admin needs access to your photos so you can add pictures of cars."
+          "photosPermission": "Thandra Admin needs access to your photos so you can add pictures of cars.",
+          "microphonePermission": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "51940f98-5c69-4cd3-86ff-540b05f9b717"
+      }
+    },
+    "owner": "anikethreddy"
   }
 }

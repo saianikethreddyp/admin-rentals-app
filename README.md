@@ -55,3 +55,16 @@ publishing it on the Play Store.
 - Maps: OpenStreetMap tiles and Nominatim search are free but meant for light use, which fits a few hub
   edits. If usage grows, switch to a paid tile and geocoding provider (for example Ola Maps).
 - Deactivating an admin or blocking a customer ends their sessions at once.
+
+## APK from GitHub
+
+Actions → **android-apk** → Run workflow. Pick `production` or `preview` (both produce an installable `.apk`). When it
+finishes, download `thandra-admin-apk` from the run's **Artifacts** and install it on the staff phones. It type-checks and
+runs the tests first, then builds on EAS.
+
+One-time setup:
+1. Repository secret `EXPO_TOKEN` (expo.dev → Account settings → Access tokens).
+2. Run `npx eas-cli build -p android --profile production` once on your computer so EAS can create the signing key
+   (CI cannot create it non-interactively). Use the same key for every later build so the APK can update in place.
+
+Over-the-air JS updates are not set up for this app yet.
